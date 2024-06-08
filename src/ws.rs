@@ -70,15 +70,13 @@ async fn client_message(client_id: &str, msg: Message, clients: &Clients) {
         Ok(v) => v,
         Err(_) => return,
     };
-    println!("{message}");
+    let new_message = format!("Message from user {} : {}", client_id, message);
     let locked = clients.lock().await;
-    match locked.get(client_id) {
-        Some(v) => {
-            if let Some(sender) = &v.sender {
-                println!("Sending back");
-                let _ = sender.send(Message::text(message));
+    for (id, val) in locked.iter() {
+        if id != client_id {
+            if let Some(sender) = &val.sender {
+                let _ = sender.send(Message::text(new_message.clone()));
             }
         }
-        None => return,
     }
 }
