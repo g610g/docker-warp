@@ -11,19 +11,22 @@ use warp::filters::ws::Message;
 use warp::Filter;
 use warp::Rejection;
 use warp::Reply;
+pub mod warp_example;
 pub mod ws;
-
 // pub const PORT: u32 = 8080;
 type Result<T> = std::result::Result<T, Rejection>;
-type ChannelReciever<T> = Arc<UnboundedReceiver<T>>;
+pub type ChannelReciever<T> = Arc<UnboundedReceiver<T>>;
 pub async fn ws_handler(
     ws: warp::ws::Ws,
     clients: Clients,
-    _channel: (UnboundedSender<Message>, ChannelReciever<Message>),
+    channel: (UnboundedSender<Message>, ChannelReciever<Message>),
 ) -> Result<impl Reply> {
     //upgrade socket
     println!("Ws handler");
-    Ok(ws.on_upgrade(move |socket| ws::client_connection(socket, clients.clone())))
+    let (rt, rx) = channel;
+    Ok(ws.on_upgrade(move |socket| {
+        ws::client_connection(socket, clients.clone(), (rt.clone(), rx.clone()))
+    }))
 }
 pub async fn run() {
     let clients: Clients = Arc::new(Mutex::new(HashMap::new()));
