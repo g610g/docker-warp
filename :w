@@ -7,7 +7,7 @@ use warp::{filters::ws::Message, reject::Rejection};
 #[derive(Debug, Clone)]
 pub struct Client {
     pub client_id: String,
-    pub sender: Option<mpsc::UnboundedSender<Message>>,
+    pub sender: Option<mpsc::UnboundedSender<std::result::Result<Message, warp::Error>>>,
 }
 
 pub type Clients = Arc<Mutex<HashMap<String, Client>>>;
@@ -17,18 +17,24 @@ pub async fn client_connection(ws: WebSocket, clients: Clients) {
     println!("Establishing client connection... {:?}", ws);
 
     //splits the websocket into sender and reciever handler
-    let (mut ws_client_sender, mut ws_client_receiver) = ws.split();
+    let (ws_client_sender, mut ws_client_receiver) = ws.split();
     //creates an unbounded channel
     let (client_sender, client_rcv) = mpsc::unbounded_channel();
-    let mut client_rcv = UnboundedReceiverStream::new(client_rcv);
+    let client_rcv = UnboundedReceiverStream::new(client_rcv);
 
-    tokio::spawn(async move {
-        while let Some(message) = client_rcv.next().await {
-            let _ = ws_client_sender.send(message).unwrap_or_else(|e| {
+    //forwarding a stream (client_rcv) and push items into the sink ()
+    tokio::spawn(async move{
+        while let Some(message) = client_rcv.next().await{
+            ws_client_sender.send(message).unwrap_or_else(|e| {
                 eprintln!("websocket send error: {}", e);
             });
+        };
+    })
+    tokio::spawn(client_rcv.forward(ws_client_sender).map(|result| {
+        if let Err(e) = result {
+            println!("Error sending websocket msg:{}", e);
         }
-    });
+    }));
 
     let uuid = uuid::Uuid::new_v4().simple().to_string();
 
@@ -41,7 +47,6 @@ pub async fn client_connection(ws: WebSocket, clients: Clients) {
 
     //websocket stream recieving value async manner
     while let Some(result) = ws_client_receiver.next().await {
-        println!("websocket Client recieves: {:?}", result);
         let msg = match result {
             Ok(msg) => msg,
             Err(e) => {
@@ -66,7 +71,7 @@ async fn client_message(client_id: &str, msg: Message, clients: &Clients) {
         Some(v) => {
             if let Some(sender) = &v.sender {
                 println!("Sending Shit");
-                let _ = sender.send(Message::text("pong"));
+                let _ = sender.send(Ok(Message::text("pong")));
             }
         }
         None => return,
