@@ -11,6 +11,7 @@ use warp::filters::ws::Message;
 use warp::Filter;
 use warp::Rejection;
 use warp::Reply;
+pub mod docker;
 pub mod warp_example;
 pub mod ws;
 // pub const PORT: u32 = 8080;
