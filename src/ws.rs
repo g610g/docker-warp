@@ -1,3 +1,4 @@
+use docker_api::Docker;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
@@ -16,7 +17,7 @@ pub struct Client {
 pub type Clients = Arc<Mutex<HashMap<String, Client>>>;
 pub type Result<T> = std::result::Result<T, Rejection>;
 type Channel = (UnboundedSender<Message>, ChannelReciever<Message>);
-pub async fn client_connection(ws: WebSocket, clients: Clients, channel: Channel) {
+pub async fn client_connection(ws: WebSocket, clients: Clients, docker: Docker) {
     println!("Establishing client connection... {:?}", ws);
 
     //splits the websocket into sender and reciever handler

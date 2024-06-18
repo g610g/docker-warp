@@ -15,7 +15,7 @@ impl Add for Point {
         };
     }
 }
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    docker_warp::docker::docker().await;
+    docker_warp::run().await;
 }
