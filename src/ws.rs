@@ -1,4 +1,3 @@
-use crate::docker::WsDocker;
 use crate::ChannelReciever;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use std::{collections::HashMap, sync::Arc};
@@ -16,12 +15,11 @@ pub struct Client {
 pub type Clients = Arc<Mutex<HashMap<String, Client>>>;
 pub type Result<T> = std::result::Result<T, Rejection>;
 type _Channel = (UnboundedSender<Message>, ChannelReciever<Message>);
-pub async fn client_connection(ws: WebSocket, clients: Clients, _ws: WsDocker) {
+pub async fn client_connection(ws: WebSocket, clients: Clients) {
     println!("Establishing client connection... {:?}", ws);
-    println!("Initializing Docker interface...");
-    let (mut ws_client_sender, _ws_client_receiver) = ws.split();
-    //creates an unbounded channel
+    let (mut ws_client_sender, _) = ws.split();
 
+    //creates an unbounded channel
     let (client_sender, client_rcv) = mpsc::unbounded_channel();
     let mut client_rcv = UnboundedReceiverStream::new(client_rcv);
 
@@ -50,17 +48,4 @@ pub async fn client_connection(ws: WebSocket, clients: Clients, _ws: WsDocker) {
 
     // clients.lock().await.remove(&uuid);
     // println!("user: {} disconnected", uuid);
-}
-async fn client_message(client_id: &str, msg: Message, clients: &Clients) {
-    let message = match msg.to_str() {
-        Ok(v) => v,
-        Err(_) => return,
-    };
-    let new_message = format!("Message from user {} : {}", client_id, message);
-    let locked = clients.lock().await;
-    for (_, val) in locked.iter() {
-        if let Some(sender) = &val.sender {
-            let _ = sender.send(Message::text(new_message.clone()));
-        }
-    }
 }

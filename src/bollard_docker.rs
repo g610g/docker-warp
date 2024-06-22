@@ -1,38 +1,41 @@
+use crate::ws::Clients;
 use bollard::{
     container::{ListContainersOptions, LogOutput, LogsOptions},
     secret::ContainerSummary,
     Docker,
 };
-use std::error;
+use std::{error, str::from_utf8};
 use tokio_stream::StreamExt;
+use warp::filters::ws::Message;
 
-use crate::ws::Clients;
-pub async fn run_with_bollard() -> Result<(), Box<dyn error::Error>> {
+pub async fn initialize(clients: Clients) -> Result<(), Box<dyn error::Error>> {
     let docker_interface = Docker::connect_with_unix_defaults()?;
+    // let mut handlers = vec![];
     let container_summary_vec = docker_interface
         .list_containers(Some(ListContainersOptions::<String> {
             all: true,
             ..Default::default()
         }))
         .await?;
-    let mut handlers = vec![];
+
     for container_summary in container_summary_vec {
+        let clients_clone = clients.clone();
         let docker_interface_clone = docker_interface.clone();
         let handler = tokio::spawn(async move {
-            get_logs(&docker_interface_clone, container_summary)
+            get_logs(docker_interface_clone, container_summary, clients_clone)
                 .await
                 .unwrap();
         });
-        handlers.push(handler);
+        // handlers.push(handler);
     }
-    for handler in handlers {
-        let _ = handler.await;
-    }
+    // for handler in handlers {
+    //     let _ = handler.await;
+    // }
     Ok(())
 }
 
 async fn get_logs(
-    docker_interface: &Docker,
+    docker_interface: Docker,
     container_summary: ContainerSummary,
     clients: Clients,
 ) -> Result<(), Box<dyn error::Error>> {
@@ -54,15 +57,15 @@ async fn get_logs(
     while let Some(data) = stream.next().await {
         if let Ok(logoutput) = data {
             match logoutput {
-                LogOutput::StdErr { message } => {
-                    eprintln!("Bytes we recieve stderr: {:?}", message);
-                }
                 LogOutput::StdOut { message } => {
-                    //this is the thing we want
-                    println!("Bytes we recieve from stdout: {:?}", message);
-                }
-                LogOutput::StdIn { message } => {
-                    println!("Bytes we recieve from stdin: {:?}", message);
+                    let locked = clients.lock().await;
+                    for (_, val) in locked.iter() {
+                        if let Some(sender) = &val.sender {
+                            let string_message = from_utf8(&message)?;
+                            println!("Logs");
+                            let _ = sender.send(Message::text(string_message));
+                        }
+                    }
                 }
                 _ => println!("Idk what to do for the console"),
             }
