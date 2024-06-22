@@ -313,6 +313,7 @@ dependencies = [
 name = "docker-warp"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "docker-api",
  "futures",
  "futures-util",

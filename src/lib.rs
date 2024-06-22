@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use std::sync::Arc;
 
 use crate::ws::Clients;
-use docker_api::Docker;
+use docker::WsDocker;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::Mutex;
 use warp::Filter;
@@ -17,7 +17,7 @@ type Result<T> = std::result::Result<T, Rejection>;
 pub type ChannelReciever<T> = Arc<UnboundedReceiver<T>>;
 pub async fn ws_handler(
     ws: warp::ws::Ws,
-    clients_and_docker: (Clients, Docker),
+    clients_and_docker: (Clients, WsDocker),
 ) -> Result<impl Reply> {
     //upgrade socket
     println!("Ws handler");
@@ -27,7 +27,7 @@ pub async fn ws_handler(
 }
 pub async fn run() {
     let clients: Clients = Arc::new(Mutex::new(HashMap::new()));
-    let docker = docker_api::Docker::unix("/var/run/docker.sock");
+    let docker = WsDocker::new("/var/run/docker.sock").unwrap();
     println!("Configuring websocket");
     let ws_route = warp::path("ws")
         .and(warp::ws())
@@ -45,7 +45,7 @@ pub async fn run() {
 // }
 fn with_clients(
     clients: Clients,
-    docker_instance: Docker,
-) -> impl Filter<Extract = ((Clients, Docker),), Error = Infallible> + Clone {
+    docker_instance: WsDocker,
+) -> impl Filter<Extract = ((Clients, WsDocker),), Error = Infallible> + Clone {
     warp::any().map(move || (clients.clone(), docker_instance.clone()))
 }
