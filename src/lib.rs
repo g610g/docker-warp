@@ -1,14 +1,14 @@
+use crate::ws::Clients;
+use docker::WsDocker;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
-
-use crate::ws::Clients;
-use docker::WsDocker;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::Mutex;
 use warp::Filter;
 use warp::Rejection;
 use warp::Reply;
+pub mod bollard_docker;
 pub mod docker;
 pub mod warp_example;
 pub mod ws;

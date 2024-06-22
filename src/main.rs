@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 use std::ops::Add;
 
-use docker_warp::docker::WsDocker;
-
 #[derive(Debug)]
 struct Point {
     x: u32,
@@ -20,5 +18,7 @@ impl Add for Point {
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     // docker_warp::run().await;
-    docker_warp::run().await;
+    docker_warp::bollard_docker::run_with_bollard()
+        .await
+        .unwrap();
 }

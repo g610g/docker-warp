@@ -1,3 +1,5 @@
+use crate::docker::WsDocker;
+use crate::ChannelReciever;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
@@ -5,9 +7,6 @@ use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use warp::ws::WebSocket;
 use warp::{filters::ws::Message, reject::Rejection};
-
-use crate::docker::{self, WsDocker};
-use crate::ChannelReciever;
 #[derive(Debug, Clone)]
 pub struct Client {
     pub client_id: String,
@@ -17,7 +16,7 @@ pub struct Client {
 pub type Clients = Arc<Mutex<HashMap<String, Client>>>;
 pub type Result<T> = std::result::Result<T, Rejection>;
 type _Channel = (UnboundedSender<Message>, ChannelReciever<Message>);
-pub async fn client_connection(ws: WebSocket, clients: Clients, ws_docker: WsDocker) {
+pub async fn client_connection(ws: WebSocket, clients: Clients, _ws: WsDocker) {
     println!("Establishing client connection... {:?}", ws);
     println!("Initializing Docker interface...");
     let (mut ws_client_sender, _ws_client_receiver) = ws.split();
@@ -40,32 +39,15 @@ pub async fn client_connection(ws: WebSocket, clients: Clients, ws_docker: WsDoc
     });
 
     let uuid = uuid::Uuid::new_v4().simple().to_string();
-
     //creates a new client
     let new_client = Client {
         client_id: uuid.clone(),
         sender: Some(client_sender),
     };
     clients.lock().await.insert(uuid.clone(), new_client);
-    let containers = ws_docker.give_containers().await;
-    let logging_opt = ws_docker.build_logging_options();
-    for container in containers {
-        let logopts_clone = logging_opt.clone();
-        let uuid_clone = uuid.clone();
-        let clients_clone = clients.clone();
-        tokio::spawn(async move {
-            while let Some(chunk) = container.logs(&logopts_clone).next().await {
-                match chunk {
-                    Ok(chunk) => {
-                        let str = docker::bytes_to_string(chunk);
-                        let msg = Message::text(str);
-                        client_message(&uuid_clone, msg, &clients_clone).await;
-                    }
-                    Err(e) => eprintln!("We got error from stream log: {e}"),
-                }
-            }
-        });
-    }
+
+    //create tasks that each will get the stream of data for each containers
+
     // clients.lock().await.remove(&uuid);
     // println!("user: {} disconnected", uuid);
 }
